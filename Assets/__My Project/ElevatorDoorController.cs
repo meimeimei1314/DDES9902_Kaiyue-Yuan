@@ -28,16 +28,27 @@ public class ElevatorDoorController : MonoBehaviour
     public float travelDelay = 5f;
     private Coroutine travelCoroutine;
 
-    public GameObject dialoguePanel;   // 第一轮
-    public GameObject followUpPanel;   // 第二轮
+    [Header("Dialogue Panels")]
+    public GameObject dialoguePanel;
+    public GameObject morningFollowUpPanel;
+    public GameObject askFollowUpPanel;
+    public GameObject silentFollowUpPanel;
 
+    [Header("Result")]
     public GameObject resultPanel;
     public TextMeshProUGUI resultLevelText;
 
+    [Header("Exit Guidance Sign")]
+    public GameObject exitPromptSign;
+
     public MonoBehaviour raycastInteractor;
 
+    [Header("Speech Bubble")]
     public GameObject speechBubble;
     public TextMeshProUGUI speechBubbleText;
+
+    private string finalResult = "";
+    private bool waitingForExit = false;
 
     void Start()
     {
@@ -47,20 +58,17 @@ public class ElevatorDoorController : MonoBehaviour
         leftOpenPos = leftClosedPos + new Vector3(openDistance, 0, 0);
         rightOpenPos = rightClosedPos + new Vector3(-openDistance, 0, 0);
 
-        if (npcStudent != null)
-            npcStudent.SetActive(false);
+        if (npcStudent != null) npcStudent.SetActive(false);
 
-        if (dialoguePanel != null)
-            dialoguePanel.SetActive(false);
+        if (dialoguePanel != null) dialoguePanel.SetActive(false);
+        if (morningFollowUpPanel != null) morningFollowUpPanel.SetActive(false);
+        if (askFollowUpPanel != null) askFollowUpPanel.SetActive(false);
+        if (silentFollowUpPanel != null) silentFollowUpPanel.SetActive(false);
 
-        if (followUpPanel != null)
-            followUpPanel.SetActive(false);
+        if (resultPanel != null) resultPanel.SetActive(false);
+        if (speechBubble != null) speechBubble.SetActive(false);
 
-        if (resultPanel != null)
-            resultPanel.SetActive(false);
-
-        if (speechBubble != null)
-            speechBubble.SetActive(false);
+        if (exitPromptSign != null) exitPromptSign.SetActive(false);
     }
 
     void Update()
@@ -89,6 +97,17 @@ public class ElevatorDoorController : MonoBehaviour
             StopCoroutine(autoCloseCoroutine);
 
         autoCloseCoroutine = StartCoroutine(AutoCloseAfterDelay());
+    }
+
+    public void OpenDoorWithoutAutoClose()
+    {
+        isOpen = true;
+
+        if (autoCloseCoroutine != null)
+        {
+            StopCoroutine(autoCloseCoroutine);
+            autoCloseCoroutine = null;
+        }
     }
 
     public void CloseDoor()
@@ -174,7 +193,7 @@ public class ElevatorDoorController : MonoBehaviour
     {
         yield return new WaitForSeconds(0.5f);
 
-        ShowSpeechBubble("Morning");
+        ShowSpeechBubble("Morning.");
 
         yield return new WaitForSeconds(1.5f);
         HideSpeechBubble();
@@ -201,15 +220,51 @@ public class ElevatorDoorController : MonoBehaviour
 
     IEnumerator MorningBranch()
     {
-        ShowSpeechBubble("I'm heading to class now. What about you?");
+        ShowSpeechBubble("Heading to class?");
 
         yield return new WaitForSeconds(2f);
         HideSpeechBubble();
 
         yield return new WaitForSeconds(0.3f);
 
-        if (followUpPanel != null)
-            followUpPanel.SetActive(true);
+        if (morningFollowUpPanel != null)
+            morningFollowUpPanel.SetActive(true);
+    }
+
+    public void OnClickHaveClassSoon()
+    {
+        if (morningFollowUpPanel != null)
+            morningFollowUpPanel.SetActive(false);
+
+        StartCoroutine(HaveClassSoonBranch());
+    }
+
+    IEnumerator HaveClassSoonBranch()
+    {
+        ShowSpeechBubble("Same here. Hope your class goes well.");
+
+        yield return new WaitForSeconds(2.5f);
+        HideSpeechBubble();
+
+        StartCoroutine(EndConversationThenOpenDoor("Medium"));
+    }
+
+    public void OnClickHeadingOut()
+    {
+        if (morningFollowUpPanel != null)
+            morningFollowUpPanel.SetActive(false);
+
+        StartCoroutine(HeadingOutBranch());
+    }
+
+    IEnumerator HeadingOutBranch()
+    {
+        ShowSpeechBubble("Nice. Have a good day.");
+
+        yield return new WaitForSeconds(2.5f);
+        HideSpeechBubble();
+
+        StartCoroutine(EndConversationThenOpenDoor("Medium"));
     }
 
     public void OnClickHi()
@@ -222,12 +277,51 @@ public class ElevatorDoorController : MonoBehaviour
 
     IEnumerator AskClassBranch()
     {
-        ShowSpeechBubble("Yeah, I have a lecture soon.");
+        ShowSpeechBubble("Yeah, I have a lecture soon. What about you?");
 
-        yield return new WaitForSeconds(2f);
+        yield return new WaitForSeconds(2.5f);
         HideSpeechBubble();
 
-        ShowResultPanel("High");
+        yield return new WaitForSeconds(0.3f);
+
+        if (askFollowUpPanel != null)
+            askFollowUpPanel.SetActive(true);
+    }
+
+    public void OnClickSameClass()
+    {
+        if (askFollowUpPanel != null)
+            askFollowUpPanel.SetActive(false);
+
+        StartCoroutine(SameClassBranch());
+    }
+
+    IEnumerator SameClassBranch()
+    {
+        ShowSpeechBubble("Nice, good luck with your class.");
+
+        yield return new WaitForSeconds(2.5f);
+        HideSpeechBubble();
+
+        StartCoroutine(EndConversationThenOpenDoor("High"));
+    }
+
+    public void OnClickGoingToStudy()
+    {
+        if (askFollowUpPanel != null)
+            askFollowUpPanel.SetActive(false);
+
+        StartCoroutine(GoingToStudyBranch());
+    }
+
+    IEnumerator GoingToStudyBranch()
+    {
+        ShowSpeechBubble("That sounds productive. Good luck!");
+
+        yield return new WaitForSeconds(2.5f);
+        HideSpeechBubble();
+
+        StartCoroutine(EndConversationThenOpenDoor("High"));
     }
 
     public void OnClickJustNod()
@@ -240,39 +334,98 @@ public class ElevatorDoorController : MonoBehaviour
 
     IEnumerator SilentBranch()
     {
-        ShowSpeechBubble("...");
+        ShowSpeechBubble("Oh, quiet morning?");
 
-        yield return new WaitForSeconds(2f);
+        yield return new WaitForSeconds(2.5f);
         HideSpeechBubble();
 
-        ShowResultPanel("Low");
+        yield return new WaitForSeconds(0.3f);
+
+        if (silentFollowUpPanel != null)
+            silentFollowUpPanel.SetActive(true);
     }
 
-    public void OnClickSame()
+    public void OnClickTired()
     {
-        if (followUpPanel != null)
-            followUpPanel.SetActive(false);
+        if (silentFollowUpPanel != null)
+            silentFollowUpPanel.SetActive(false);
 
-        ShowResultPanel("Medium");
+        StartCoroutine(TiredBranch());
     }
 
-    public void OnClickStudy()
+    IEnumerator TiredBranch()
     {
-        if (followUpPanel != null)
-            followUpPanel.SetActive(false);
+        ShowSpeechBubble("No worries. Early mornings are hard.");
 
-        ShowResultPanel("High");
+        yield return new WaitForSeconds(2.5f);
+        HideSpeechBubble();
+
+        StartCoroutine(EndConversationThenOpenDoor("Medium"));
+    }
+
+    public void OnClickSorryMorning()
+    {
+        if (silentFollowUpPanel != null)
+            silentFollowUpPanel.SetActive(false);
+
+        StartCoroutine(SorryMorningBranch());
+    }
+
+    IEnumerator SorryMorningBranch()
+    {
+        ShowSpeechBubble("All good. Morning.");
+
+        yield return new WaitForSeconds(2.5f);
+        HideSpeechBubble();
+
+        StartCoroutine(EndConversationThenOpenDoor("Medium"));
+    }
+
+    IEnumerator EndConversationThenOpenDoor(string level)
+    {
+        finalResult = level;
+
+        if (dialoguePanel != null) dialoguePanel.SetActive(false);
+        if (morningFollowUpPanel != null) morningFollowUpPanel.SetActive(false);
+        if (askFollowUpPanel != null) askFollowUpPanel.SetActive(false);
+        if (silentFollowUpPanel != null) silentFollowUpPanel.SetActive(false);
+
+        yield return new WaitForSeconds(2.5f);
+
+        OpenDoorWithoutAutoClose();
+
+        waitingForExit = true;
+
+        Cursor.visible = false;
+        Cursor.lockState = CursorLockMode.Locked;
+
+        if (raycastInteractor != null)
+            raycastInteractor.enabled = true;
+
+        if (exitPromptSign != null)
+            exitPromptSign.SetActive(true);
+    }
+
+    public void OnPlayerExitElevator()
+    {
+        if (!waitingForExit) return;
+
+        waitingForExit = false;
+
+        if (exitPromptSign != null)
+            exitPromptSign.SetActive(false);
+
+        ShowResultPanel(finalResult);
     }
 
     void ShowResultPanel(string level)
     {
         HideSpeechBubble();
 
-        if (dialoguePanel != null)
-            dialoguePanel.SetActive(false);
-
-        if (followUpPanel != null)
-            followUpPanel.SetActive(false);
+        if (dialoguePanel != null) dialoguePanel.SetActive(false);
+        if (morningFollowUpPanel != null) morningFollowUpPanel.SetActive(false);
+        if (askFollowUpPanel != null) askFollowUpPanel.SetActive(false);
+        if (silentFollowUpPanel != null) silentFollowUpPanel.SetActive(false);
 
         if (resultPanel != null)
             resultPanel.SetActive(true);
@@ -282,17 +435,11 @@ public class ElevatorDoorController : MonoBehaviour
             resultLevelText.text = level;
 
             if (level == "High")
-            {
                 resultLevelText.color = Color.green;
-            }
             else if (level == "Medium")
-            {
                 resultLevelText.color = Color.yellow;
-            }
             else if (level == "Low")
-            {
                 resultLevelText.color = Color.red;
-            }
         }
 
         Cursor.visible = true;
