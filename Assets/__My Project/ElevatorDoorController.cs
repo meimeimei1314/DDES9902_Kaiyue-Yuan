@@ -28,11 +28,20 @@ public class ElevatorDoorController : MonoBehaviour
     public float travelDelay = 5f;
     private Coroutine travelCoroutine;
 
+    [Header("Spatial Zone Check")]
+    public bool playerInBackZone = false;
+
+    [Header("Gaze-Based Spatial Interaction")]
+    public Transform playerTransform;
+    public Transform backLookTarget;
+    public float backLookThreshold = 0.6f;
+
     [Header("Dialogue Panels")]
     public GameObject dialoguePanel;
     public GameObject morningFollowUpPanel;
     public GameObject askFollowUpPanel;
     public GameObject silentFollowUpPanel;
+    public GameObject missedConversationPanel;
 
     [Header("Result")]
     public GameObject resultPanel;
@@ -64,10 +73,10 @@ public class ElevatorDoorController : MonoBehaviour
         if (morningFollowUpPanel != null) morningFollowUpPanel.SetActive(false);
         if (askFollowUpPanel != null) askFollowUpPanel.SetActive(false);
         if (silentFollowUpPanel != null) silentFollowUpPanel.SetActive(false);
+        if (missedConversationPanel != null) missedConversationPanel.SetActive(false);
 
         if (resultPanel != null) resultPanel.SetActive(false);
         if (speechBubble != null) speechBubble.SetActive(false);
-
         if (exitPromptSign != null) exitPromptSign.SetActive(false);
     }
 
@@ -171,7 +180,87 @@ public class ElevatorDoorController : MonoBehaviour
             yield return null;
         }
 
-        StartCoroutine(StartConversation());
+        StartCoroutine(CheckSpatialInteraction());
+    }
+
+    IEnumerator CheckSpatialInteraction()
+    {
+        yield return new WaitForSeconds(0.8f);
+
+        bool lookingAtBackTarget = false;
+
+        if (playerTransform != null && backLookTarget != null)
+        {
+            Vector3 directionToBack = backLookTarget.position - playerTransform.position;
+            directionToBack.y = 0;
+
+            Vector3 playerForward = playerTransform.forward;
+            playerForward.y = 0;
+
+            float dot = Vector3.Dot(playerForward.normalized, directionToBack.normalized);
+            lookingAtBackTarget = dot > backLookThreshold;
+        }
+
+        if (playerInBackZone)
+        {
+            StartCoroutine(MissedByBackZoneRoutine());
+        }
+        else if (lookingAtBackTarget)
+        {
+            StartCoroutine(MissedByLookingBackRoutine());
+        }
+        else
+        {
+            StartCoroutine(StartConversation());
+        }
+    }
+
+    IEnumerator MissedByBackZoneRoutine()
+    {
+        finalResult = "Low";
+
+        ShowSpeechBubble("...");
+
+        yield return new WaitForSeconds(3f);
+
+        HideSpeechBubble();
+
+        OpenDoorWithoutAutoClose();
+
+        waitingForExit = true;
+
+        Cursor.visible = false;
+        Cursor.lockState = CursorLockMode.Locked;
+
+        if (raycastInteractor != null)
+            raycastInteractor.enabled = true;
+
+        if (exitPromptSign != null)
+            exitPromptSign.SetActive(true);
+    }
+
+    IEnumerator MissedByLookingBackRoutine()
+    {
+        finalResult = "Low";
+
+        yield return new WaitForSeconds(1f);
+
+        Cursor.visible = true;
+        Cursor.lockState = CursorLockMode.None;
+
+        if (raycastInteractor != null)
+            raycastInteractor.enabled = false;
+
+        if (missedConversationPanel != null)
+            missedConversationPanel.SetActive(true);
+    }
+
+    public void OnClickMissedConversationOK()
+    {
+        if (missedConversationPanel != null)
+            missedConversationPanel.SetActive(false);
+
+        ShowResultPanel("Low");
     }
 
     public void ShowSpeechBubble(string message)
@@ -389,8 +478,9 @@ public class ElevatorDoorController : MonoBehaviour
         if (morningFollowUpPanel != null) morningFollowUpPanel.SetActive(false);
         if (askFollowUpPanel != null) askFollowUpPanel.SetActive(false);
         if (silentFollowUpPanel != null) silentFollowUpPanel.SetActive(false);
+        if (missedConversationPanel != null) missedConversationPanel.SetActive(false);
 
-        yield return new WaitForSeconds(2.5f);
+        yield return new WaitForSeconds(5f);
 
         OpenDoorWithoutAutoClose();
 
@@ -426,6 +516,7 @@ public class ElevatorDoorController : MonoBehaviour
         if (morningFollowUpPanel != null) morningFollowUpPanel.SetActive(false);
         if (askFollowUpPanel != null) askFollowUpPanel.SetActive(false);
         if (silentFollowUpPanel != null) silentFollowUpPanel.SetActive(false);
+        if (missedConversationPanel != null) missedConversationPanel.SetActive(false);
 
         if (resultPanel != null)
             resultPanel.SetActive(true);
